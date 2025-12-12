@@ -1,0 +1,10 @@
+{
+  "name": "wa-phone-extractor",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "fs-extra": "latest",
+    "adm-zip": "latest"
+  }
+}
