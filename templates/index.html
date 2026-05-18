@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Chess Game Analyzer</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@4/assets/styles/cm-chessboard.css">
     <style>
         body { 
             font-family: 'Segoe UI', system-ui, sans-serif; 
@@ -42,7 +42,8 @@
             box-sizing: border-box;
         }
         #myBoard {
-            width: 100% !important;
+            width: 100%;
+            aspect-ratio: 1 / 1; /* Forces the container to remain a perfect square on mobile */
             margin: 0 auto;
         }
         .input-group { display: flex; margin-bottom: 10px; }
@@ -50,13 +51,11 @@
         button { background: #81b64c; color: white; border: none; padding: 10px 15px; cursor: pointer; font-weight: bold; font-size: 15px; }
         #search-btn { border-radius: 0 4px 4px 0; }
         
-        /* Compact horizontal scroll for games list on mobile */
         #games-list { 
             display: flex;
             gap: 8px;
             overflow-x: auto;
             padding-bottom: 5px;
-            scrollbar-width: thin;
         }
         .game-item { 
             flex: 0 0 160px;
@@ -73,7 +72,7 @@
         .game-item:hover { border-color: #81b64c; }
         
         .controls { display: flex; justify-content: space-between; width: 100%; margin-top: 12px; }
-        .control-btn { flex: 1; margin: 0 5px; border-radius: 4px; background: #45413c; padding: 12px; }
+        .control-btn { flex: 1; margin: 0 5px; border-radius: 4px; background: #45413c; padding: 12px; color: white; font-weight: bold;}
         #evaluation { text-align: center; background: #312e2b; padding: 10px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; font-weight: bold; }
     </style>
 </head>
@@ -98,17 +97,17 @@
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <script type="module">
+        import { Chessboard } from "https://cdn.jsdelivr.net/npm/cm-chessboard@4/src/cm-chessboard/Chessboard.js";
 
-    <script>
-        var board = null;
-        var gameEngine = new Chess();
-        var moveHistory = [];
-        var currentMoveIndex = -1;
-        var fetchedGamesList = []; 
+        window.board = null;
+        window.gameEngine = new Chess();
+        window.moveHistory = [];
+        window.currentMoveIndex = -1;
+        window.fetchedGamesList = []; 
 
+        // Load Stockfish Engine
         var stockfish = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
 
         stockfish.onmessage = function(event) {
@@ -117,7 +116,7 @@
                 const parts = line.split(' ');
                 const cpIndex = parts.indexOf('cp');
                 let score = (parseInt(parts[cpIndex + 1]) / 100).toFixed(2);
-                if (gameEngine.turn() === 'b') { score = -score; }
+                if (window.gameEngine.turn() === 'b') { score = -score; }
                 document.getElementById('evaluation').innerText = `Evaluation: ${score > 0 ? '+' : ''}${score}`;
             } else if (line.includes('score mate')) {
                 const parts = line.split(' ');
@@ -126,18 +125,13 @@
             }
         };
 
-        $(document).ready(function() {
-            board = Chessboard('myBoard', {
-                position: 'start',
-                draggable: true,
-                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-            });
-            
-            // Adjust board size dynamically to fit phone viewport widths
-            $(window).resize(board.resize);
+        // Initialize natively scalable board layout
+        window.board = new Chessboard(document.getElementById("myBoard"), {
+            position: "start",
+            sprite: { url: "https://cdn.jsdelivr.net/npm/cm-chessboard@4/assets/images/chessboard-sprite.svg" }
         });
 
-        function fetchGames() {
+        window.fetchGames = function() {
             const user = document.getElementById('username').value.trim();
             const listDiv = document.getElementById('games-list');
             if(!user) return;
@@ -149,7 +143,7 @@
                     listDiv.innerHTML = "";
                     if(data.error) { listDiv.innerHTML = `<p style="color:#ff6b6b; font-size:14px;">${data.error}</p>`; return; }
                     
-                    fetchedGamesList = data; 
+                    window.fetchedGamesList = data; 
                     
                     data.forEach((game, index) => {
                         const item = document.createElement('div');
@@ -162,45 +156,44 @@
         }
 
         function selectGameByIndex(index) {
-            const selectedGame = fetchedGamesList[index];
+            const selectedGame = window.fetchedGamesList[index];
             if (selectedGame && selectedGame.pgn) {
                 loadGamePgn(selectedGame.pgn);
             }
         }
 
         function loadGamePgn(pgn) {
-            gameEngine.load_pgn(pgn);
-            moveHistory = gameEngine.history({ verbose: true });
-            gameEngine.reset();
-            board.start();
-            currentMoveIndex = -1;
+            window.gameEngine.load_pgn(pgn);
+            window.moveHistory = window.gameEngine.history({ verbose: true });
+            window.gameEngine.reset();
+            window.board.setPosition("start");
+            window.currentMoveIndex = -1;
             document.getElementById('evaluation').innerText = "Evaluation: 0.00";
         }
 
         function runEngineAnalysis() {
             document.getElementById('evaluation').innerText = "Analyzing...";
-            stockfish.postMessage('position fen ' + gameEngine.fen());
+            stockfish.postMessage('position fen ' + window.gameEngine.fen());
             stockfish.postMessage('go depth 10'); 
         }
 
-        function moveForward() {
-            if (currentMoveIndex < moveHistory.length - 1) {
-                currentMoveIndex++;
-                gameEngine.move(moveHistory[currentMoveIndex].san);
-                board.position(gameEngine.fen());
+        window.moveForward = function() {
+            if (window.currentMoveIndex < window.moveHistory.length - 1) {
+                window.currentMoveIndex++;
+                window.gameEngine.move(window.moveHistory[window.currentMoveIndex].san);
+                window.board.setPosition(window.gameEngine.fen());
                 runEngineAnalysis();
             }
         }
 
-        function moveBack() {
-            if (currentMoveIndex >= 0) {
-                gameEngine.undo();
-                board.position(gameEngine.fen());
+        window.moveBack = function() {
+            if (window.currentMoveIndex >= 0) {
+                window.gameEngine.undo();
+                window.board.setPosition(window.gameEngine.fen());
                 runEngineAnalysis();
-                currentMoveIndex--;
+                window.currentMoveIndex--;
             }
         }
     </script>
 </body>
-    </html>
-    
+</html>
