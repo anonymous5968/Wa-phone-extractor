@@ -2,29 +2,84 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Chess Game Analyzer</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
     <style>
-        body { font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; margin: 0; padding: 15px; background: #262522; color: #fff; align-items: center; }
-        #sidebar { width: 100%; max-width: 450px; background: #312e2b; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-sizing: border-box; }
-        #main-layout { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 450px; }
-        #board-container { width: 100%; }
-        .input-group { display: flex; margin-bottom: 15px; }
-        input { flex: 1; padding: 12px; border: none; border-radius: 4px 0 0 4px; font-size: 16px; background: #45413c; color: white; }
-        button { background: #81b64c; color: white; border: none; padding: 12px 20px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            margin: 0; 
+            padding: 10px; 
+            background: #262522; 
+            color: #fff; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-sizing: border-box;
+            min-height: 100vh;
+        }
+        #sidebar { 
+            width: 100%; 
+            max-width: 400px; 
+            background: #312e2b; 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin-bottom: 15px; 
+            box-sizing: border-box; 
+        }
+        #main-layout { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            width: 100%; 
+            max-width: 400px; 
+            box-sizing: border-box;
+        }
+        #board-container { 
+            width: 100%; 
+            max-width: 380px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+        #myBoard {
+            width: 100% !important;
+            margin: 0 auto;
+        }
+        .input-group { display: flex; margin-bottom: 10px; }
+        input { flex: 1; padding: 10px; border: none; border-radius: 4px 0 0 4px; font-size: 15px; background: #45413c; color: white; }
+        button { background: #81b64c; color: white; border: none; padding: 10px 15px; cursor: pointer; font-weight: bold; font-size: 15px; }
         #search-btn { border-radius: 0 4px 4px 0; }
-        .game-item { background: #262522; padding: 12px; margin: 8px 0; cursor: pointer; border-radius: 6px; border: 1px solid #45413c; }
+        
+        /* Compact horizontal scroll for games list on mobile */
+        #games-list { 
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            scrollbar-width: thin;
+        }
+        .game-item { 
+            flex: 0 0 160px;
+            background: #262522; 
+            padding: 8px; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            border: 1px solid #45413c; 
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .game-item:hover { border-color: #81b64c; }
-        .controls { display: flex; justify-content: space-between; width: 100%; margin-top: 15px; }
-        .control-btn { flex: 1; margin: 0 5px; border-radius: 4px; background: #45413c; }
-        #evaluation { text-align: center; background: #312e2b; padding: 12px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 18px; }
+        
+        .controls { display: flex; justify-content: space-between; width: 100%; margin-top: 12px; }
+        .control-btn { flex: 1; margin: 0 5px; border-radius: 4px; background: #45413c; padding: 12px; }
+        #evaluation { text-align: center; background: #312e2b; padding: 10px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
-        <h3>Connect Chess.com</h3>
         <div class="input-group">
             <input type="text" id="username" placeholder="Username...">
             <button id="search-btn" onclick="fetchGames()">Load</button>
@@ -33,7 +88,7 @@
     </div>
 
     <div id="main-layout">
-        <h3 id="evaluation">Evaluation: 0.00</h3>
+        <div id="evaluation">Evaluation: 0.00</div>
         <div id="board-container">
             <div id="myBoard"></div>
             <div class="controls">
@@ -54,7 +109,6 @@
         var currentMoveIndex = -1;
         var fetchedGamesList = []; 
 
-        // Load Stockfish Worker via CDN
         var stockfish = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
 
         stockfish.onmessage = function(event) {
@@ -78,26 +132,29 @@
                 draggable: true,
                 pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
             });
+            
+            // Adjust board size dynamically to fit phone viewport widths
+            $(window).resize(board.resize);
         });
 
         function fetchGames() {
             const user = document.getElementById('username').value.trim();
             const listDiv = document.getElementById('games-list');
             if(!user) return;
-            listDiv.innerHTML = "<p>Loading games...</p>";
+            listDiv.innerHTML = "<p style='font-size:14px;'>Loading...</p>";
 
             fetch(`/api/games/${user}`)
                 .then(res => res.json())
                 .then(data => {
                     listDiv.innerHTML = "";
-                    if(data.error) { listDiv.innerHTML = `<p style="color:#ff6b6b">${data.error}</p>`; return; }
+                    if(data.error) { listDiv.innerHTML = `<p style="color:#ff6b6b; font-size:14px;">${data.error}</p>`; return; }
                     
                     fetchedGamesList = data; 
                     
                     data.forEach((game, index) => {
                         const item = document.createElement('div');
                         item.className = 'game-item';
-                        item.innerHTML = `<strong>${game.white}</strong> vs <strong>${game.black}</strong><br><small style="color:#b1b0af">${game.result}</small>`;
+                        item.innerHTML = `<strong>${game.white}</strong> vs <strong>${game.black}</strong><br><span style="color:#b1b0af">${game.result}</span>`;
                         item.onclick = () => selectGameByIndex(index); 
                         listDiv.appendChild(item);
                     });
@@ -145,5 +202,5 @@
         }
     </script>
 </body>
-                                 </html>
-        
+    </html>
+    
