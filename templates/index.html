@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Chess Game Analyzer</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cm-chessboard@4/assets/styles/cm-chessboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
     <style>
         body { 
             font-family: 'Segoe UI', system-ui, sans-serif; 
@@ -20,7 +20,7 @@
         }
         #sidebar { 
             width: 100%; 
-            max-width: 400px; 
+            max-width: 360px; 
             background: #312e2b; 
             padding: 12px; 
             border-radius: 8px; 
@@ -32,21 +32,20 @@
             flex-direction: column; 
             align-items: center; 
             width: 100%; 
-            max-width: 400px; 
+            max-width: 360px; 
             box-sizing: border-box;
         }
         #board-container { 
             width: 100%; 
-            max-width: 380px;
+            max-width: 340px;
             margin: 0 auto;
             box-sizing: border-box;
         }
         #myBoard {
-            width: 100%;
-            aspect-ratio: 1 / 1; 
+            width: 340px !important; /* Fixed fallback size specifically for mobile screen safety */
+            height: 340px !important;
             margin: 0 auto;
-            background: #403e3a; 
-            border-radius: 4px;
+            background: #403e3a;
         }
         .input-group { display: flex; margin-bottom: 10px; }
         input { flex: 1; padding: 10px; border: none; border-radius: 4px 0 0 4px; font-size: 15px; background: #45413c; color: white; }
@@ -58,16 +57,16 @@
             gap: 8px;
             overflow-x: auto;
             padding-bottom: 5px;
-            min-height: 40px;
+            min-height: 50px;
         }
         .game-item { 
-            flex: 0 0 160px;
+            flex: 0 0 140px;
             background: #262522; 
             padding: 8px; 
             cursor: pointer; 
             border-radius: 6px; 
             border: 1px solid #45413c; 
-            font-size: 12px;
+            font-size: 11px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -84,7 +83,7 @@
     <div id="sidebar">
         <div class="input-group">
             <input type="text" id="username" placeholder="Username...">
-            <button id="search-btn" onclick="window.fetchGames()">Load</button>
+            <button id="search-btn" onclick="fetchGames()">Load</button>
         </div>
         <div id="games-list"></div>
     </div>
@@ -94,24 +93,24 @@
         <div id="board-container">
             <div id="myBoard"></div>
             <div class="controls">
-                <button class="control-btn" onclick="window.moveBack()">◀ Back</button>
-                <button class="control-btn" onclick="window.moveForward()">Next ▶</button>
+                <button class="control-btn" onclick="moveBack()">◀ Back</button>
+                <button class="control-btn" onclick="moveForward()">Next ▶</button>
             </div>
         </div>
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    
-    <script type="module">
-        import { Chessboard } from "https://cdn.jsdelivr.net/npm/cm-chessboard@4/src/cm-chessboard/Chessboard.js";
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
 
-        window.board = null;
-        window.gameEngine = new Chess();
-        window.moveHistory = [];
-        window.currentMoveIndex = -1;
-        window.fetchedGamesList = []; 
+    <script>
+        var board = null;
+        var gameEngine = new Chess();
+        var moveHistory = [];
+        var currentMoveIndex = -1;
+        var fetchedGamesList = []; 
 
-        // Load Stockfish Engine Background Service
+        // Load Stockfish Worker
         var stockfish = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
 
         stockfish.onmessage = function(event) {
@@ -120,7 +119,7 @@
                 const parts = line.split(' ');
                 const cpIndex = parts.indexOf('cp');
                 let score = (parseInt(parts[cpIndex + 1]) / 100).toFixed(2);
-                if (window.gameEngine.turn() === 'b') { score = -score; }
+                if (gameEngine.turn() === 'b') { score = -score; }
                 document.getElementById('evaluation').innerText = `Evaluation: ${score > 0 ? '+' : ''}${score}`;
             } else if (line.includes('score mate')) {
                 const parts = line.split(' ');
@@ -129,78 +128,80 @@
             }
         };
 
-        // Initialize natively scalable vector board on page load
-        window.board = new Chessboard(document.getElementById("myBoard"), {
-            position: "start",
-            sprite: { url: "https://cdn.jsdelivr.net/npm/cm-chessboard@4/assets/images/chessboard-sprite.svg" }
+        $(document).ready(function() {
+            // Standard dynamic rendering configuration with Wikipedia piece fallbacks
+            board = Chessboard('myBoard', {
+                position: 'start',
+                showNotation: false,
+                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+            });
         });
 
-        // Explicitly exposing the fetch action to the global context
-        window.fetchGames = function() {
+        function fetchGames() {
             const user = document.getElementById('username').value.trim();
             const listDiv = document.getElementById('games-list');
             if(!user) return;
             listDiv.innerHTML = "<p style='font-size:14px;'>Loading...</p>";
 
-            fetch(`/api/games/${user}`)
-                .then(res => res.json())
-                .then(data => {
+            fetch('/api/games/' + user)
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
                     listDiv.innerHTML = "";
-                    if(data.error) { listDiv.innerHTML = `<p style="color:#ff6b6b; font-size:14px;">${data.error}</p>`; return; }
+                    if(data.error) { listDiv.innerHTML = "<p style='color:#ff6b6b; font-size:14px;'>" + data.error + "</p>"; return; }
                     
-                    window.fetchedGamesList = data; 
+                    fetchedGamesList = data; 
                     
-                    data.forEach((game, index) => {
+                    data.forEach(function(game, index) {
                         const item = document.createElement('div');
                         item.className = 'game-item';
-                        item.innerHTML = `<strong>${game.white}</strong> vs <strong>${game.black}</strong><br><span style="color:#b1b0af">${game.result}</span>`;
-                        // Fixed: Scoped window mapping directly to the click assignment
-                        item.onclick = function() { window.selectGameByIndex(index); }; 
+                        item.innerHTML = '<strong>' + game.white + '</strong> vs <strong>' + game.black + '</strong><br><span style="color:#b1b0af">' + game.result + '</span>';
+                        item.onclick = function() { selectGameByIndex(index); };
                         listDiv.appendChild(item);
                     });
+                }).catch(function() {
+                    listDiv.innerHTML = "<p style='color:#ff6b6b; font-size:14px;'>Failed to fetch.</p>";
                 });
-        };
+        }
 
-        window.selectGameByIndex = function(index) {
-            const selectedGame = window.fetchedGamesList[index];
+        function selectGameByIndex(index) {
+            var selectedGame = fetchedGamesList[index];
             if (selectedGame && selectedGame.pgn) {
                 loadGamePgn(selectedGame.pgn);
             }
-        };
+        }
 
         function loadGamePgn(pgn) {
-            window.gameEngine.load_pgn(pgn);
-            window.moveHistory = window.gameEngine.history({ verbose: true });
-            window.gameEngine.reset();
-            window.board.setPosition("start");
-            window.currentMoveIndex = -1;
+            gameEngine.load_pgn(pgn);
+            moveHistory = gameEngine.history({ verbose: true });
+            gameEngine.reset();
+            board.start();
+            currentMoveIndex = -1;
             document.getElementById('evaluation').innerText = "Evaluation: 0.00";
         }
 
         function runEngineAnalysis() {
             document.getElementById('evaluation').innerText = "Analyzing...";
-            stockfish.postMessage('position fen ' + window.gameEngine.fen());
+            stockfish.postMessage('position fen ' + gameEngine.fen());
             stockfish.postMessage('go depth 10'); 
         }
 
-        window.moveForward = function() {
-            if (window.currentMoveIndex < window.moveHistory.length - 1) {
-                window.currentMoveIndex++;
-                window.gameEngine.move(window.moveHistory[window.currentMoveIndex].san);
-                window.board.setPosition(window.gameEngine.fen());
+        function moveForward() {
+            if (currentMoveIndex < moveHistory.length - 1) {
+                currentMoveIndex++;
+                gameEngine.move(moveHistory[currentMoveIndex].san);
+                board.position(gameEngine.fen());
                 runEngineAnalysis();
             }
-        };
+        }
 
-        window.moveBack = function() {
-            if (window.currentMoveIndex >= 0) {
-                window.gameEngine.undo();
-                window.board.setPosition(window.gameEngine.fen());
+        function moveBack() {
+            if (currentMoveIndex >= 0) {
+                gameEngine.undo();
+                board.position(gameEngine.fen());
                 runEngineAnalysis();
-                window.currentMoveIndex--;
+                currentMoveIndex--;
             }
-        };
+        }
     </script>
 </body>
-    </html>
-    
+</html>
