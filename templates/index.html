@@ -50,11 +50,11 @@
         
         #evaluation { text-align: center; background: #312e2b; padding: 12px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; font-weight: bold; }
         
-        /* Pure Native Chessboard Grid Layout */
+        /* THE FIX: Hardcoded 12.5% rows and columns to prevent shapeshifting */
         #chess-grid {
             display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(8, 1fr);
+            grid-template-columns: repeat(8, 12.5%);
+            grid-template-rows: repeat(8, 12.5%);
             width: 100%;
             aspect-ratio: 1 / 1;
             border: 2px solid #312e2b;
@@ -68,6 +68,7 @@
             align-items: center;
             font-size: 2.2rem;
             user-select: none;
+            overflow: hidden; /* Prevents pieces from pushing boundaries */
         }
         .light { background-color: #f0d9b5; }
         .dark { background-color: #b58863; }
@@ -102,37 +103,52 @@
         var moveHistory = [];
         var currentMoveIndex = -1;
         var fetchedGamesList = []; 
+        var stockfish = null; 
 
-        // Universal solid shapes
         const pieceSymbols = {
             'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
             'P': '♟', 'R': '♜', 'N': '♞', 'B': '♝', 'Q': '♛', 'K': '♚'
         };
 
-        var stockfish = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
-        stockfish.onmessage = function(event) {
-            const line = event.data;
-            if (line.includes('score cp')) {
-                const parts = line.split(' ');
-                const cpIndex = parts.indexOf('cp');
-                let score = (parseInt(parts[cpIndex + 1]) / 100).toFixed(2);
-                if (gameEngine.turn() === 'b') { score = -score; }
-                document.getElementById('evaluation').innerText = "Evaluation: " + (score > 0 ? '+' : '') + score;
-            } else if (line.includes('score mate')) {
-                const parts = line.split(' ');
-                const mateIndex = parts.indexOf('mate');
-                document.getElementById('evaluation').innerText = "Mate in " + Math.abs(parts[mateIndex + 1]);
-            }
-        };
+        // Initialize Engine via Blob
+        fetch('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js')
+            .then(function(response) { return response.text(); })
+            .then(function(text) {
+                var blob = new Blob([text], {type: 'application/javascript'});
+                var blobUrl = URL.createObjectURL(blob);
+                stockfish = new Worker(blobUrl);
+                
+                stockfish.onmessage = function(event) {
+                    var line = typeof event.data === 'string' ? event.data : event.data.data;
+                    if (!line) return;
 
-        // Draws the grid safely without infinite loops
+                    if (line.includes('score cp')) {
+                        var parts = line.split(' ');
+                        var cpIndex = parts.indexOf('cp');
+                        var score = (parseInt(parts[cpIndex + 1]) / 100).toFixed(2);
+                        if (gameEngine.turn() === 'b') { score = -score; }
+                        document.getElementById('evaluation').innerText = "Evaluation: " + (score > 0 ? '+' : '') + score;
+                    } else if (line.includes('score mate')) {
+                        var parts = line.split(' ');
+                        var mateIndex = parts.indexOf('mate');
+                        document.getElementById('evaluation').innerText = "Mate in " + Math.abs(parts[mateIndex + 1]);
+                    }
+                };
+                
+                stockfish.postMessage('uci');
+            })
+            .catch(function(err) {
+                document.getElementById('evaluation').innerText = "Engine failed to load";
+                console.error(err);
+            });
+
         function drawNativeBoard() {
             const grid = document.getElementById('chess-grid');
             grid.innerHTML = '';
             const boardState = gameEngine.board(); 
 
             for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) { // TYPO FIXED HERE (c++)
+                for (let c = 0; c < 8; c++) { 
                     const square = document.createElement('div');
                     const isLight = (r + c) % 2 === 0;
                     square.className = 'square ' + (isLight ? 'light' : 'dark');
@@ -142,7 +158,7 @@
                         square.innerText = pieceSymbols[piece.type] || '';
                         if (piece.color === 'w') {
                             square.style.color = '#ffffff';
-                            square.style.textShadow = '0px 0px 3px #000'; // Black outline for white pieces
+                            square.style.textShadow = '0px 0px 3px #000'; 
                         } else {
                             square.style.color = '#000000';
                         }
@@ -195,9 +211,13 @@
         }
 
         function runEngineAnalysis() {
-            document.getElementById('evaluation').innerText = "Analyzing...";
-            stockfish.postMessage('position fen ' + gameEngine.fen());
-            stockfish.postMessage('go depth 10'); 
+            if (stockfish) {
+                document.getElementById('evaluation').innerText = "Analyzing...";
+                stockfish.postMessage('position fen ' + gameEngine.fen());
+                stockfish.postMessage('go depth 10'); 
+            } else {
+                document.getElementById('evaluation').innerText = "Engine initializing...";
+            }
         }
 
         function moveForward() {
