@@ -43,9 +43,9 @@
         }
         #myBoard {
             width: 100%;
-            aspect-ratio: 1 / 1; /* Forces the container to remain a perfect square on mobile */
+            aspect-ratio: 1 / 1; 
             margin: 0 auto;
-            background: #403e3a; /* Fallback square background */
+            background: #403e3a; 
             border-radius: 4px;
         }
         .input-group { display: flex; margin-bottom: 10px; }
@@ -58,6 +58,7 @@
             gap: 8px;
             overflow-x: auto;
             padding-bottom: 5px;
+            min-height: 40px;
         }
         .game-item { 
             flex: 0 0 160px;
@@ -153,7 +154,8 @@
                         const item = document.createElement('div');
                         item.className = 'game-item';
                         item.innerHTML = `<strong>${game.white}</strong> vs <strong>${game.black}</strong><br><span style="color:#b1b0af">${game.result}</span>`;
-                        item.onclick = () => window.selectGameByIndex(index); 
+                        // Fixed: Scoped window mapping directly to the click assignment
+                        item.onclick = function() { window.selectGameByIndex(index); }; 
                         listDiv.appendChild(item);
                     });
                 });
@@ -200,5 +202,5 @@
         };
     </script>
 </body>
-            </html>
+    </html>
     
