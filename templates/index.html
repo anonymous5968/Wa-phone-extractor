@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,6 +52,7 @@
         var gameEngine = new Chess();
         var moveHistory = [];
         var currentMoveIndex = -1;
+        var fetchedGamesList = []; 
 
         // Load Stockfish Worker via CDN
         var stockfish = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
@@ -73,7 +73,11 @@
         };
 
         $(document).ready(function() {
-            board = Chessboard('myBoard', 'start');
+            board = Chessboard('myBoard', {
+                position: 'start',
+                draggable: true,
+                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+            });
         });
 
         function fetchGames() {
@@ -87,14 +91,24 @@
                 .then(data => {
                     listDiv.innerHTML = "";
                     if(data.error) { listDiv.innerHTML = `<p style="color:#ff6b6b">${data.error}</p>`; return; }
-                    data.forEach((game) => {
+                    
+                    fetchedGamesList = data; 
+                    
+                    data.forEach((game, index) => {
                         const item = document.createElement('div');
                         item.className = 'game-item';
                         item.innerHTML = `<strong>${game.white}</strong> vs <strong>${game.black}</strong><br><small style="color:#b1b0af">${game.result}</small>`;
-                        item.onclick = () => loadGamePgn(game.pgn);
+                        item.onclick = () => selectGameByIndex(index); 
                         listDiv.appendChild(item);
                     });
                 });
+        }
+
+        function selectGameByIndex(index) {
+            const selectedGame = fetchedGamesList[index];
+            if (selectedGame && selectedGame.pgn) {
+                loadGamePgn(selectedGame.pgn);
+            }
         }
 
         function loadGamePgn(pgn) {
@@ -131,4 +145,5 @@
         }
     </script>
 </body>
-</html>
+                                 </html>
+        
