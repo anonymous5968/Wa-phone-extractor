@@ -45,6 +45,8 @@
             width: 100%;
             aspect-ratio: 1 / 1; /* Forces the container to remain a perfect square on mobile */
             margin: 0 auto;
+            background: #403e3a; /* Fallback square background */
+            border-radius: 4px;
         }
         .input-group { display: flex; margin-bottom: 10px; }
         input { flex: 1; padding: 10px; border: none; border-radius: 4px 0 0 4px; font-size: 15px; background: #45413c; color: white; }
@@ -72,7 +74,7 @@
         .game-item:hover { border-color: #81b64c; }
         
         .controls { display: flex; justify-content: space-between; width: 100%; margin-top: 12px; }
-        .control-btn { flex: 1; margin: 0 5px; border-radius: 4px; background: #45413c; padding: 12px; color: white; font-weight: bold;}
+        .control-btn { flex: 1; margin: 0 5px; border-radius: 4px; background: #45413c; padding: 12px; color: white; font-weight: bold; border: none;}
         #evaluation { text-align: center; background: #312e2b; padding: 10px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; font-weight: bold; }
     </style>
 </head>
@@ -81,7 +83,7 @@
     <div id="sidebar">
         <div class="input-group">
             <input type="text" id="username" placeholder="Username...">
-            <button id="search-btn" onclick="fetchGames()">Load</button>
+            <button id="search-btn" onclick="window.fetchGames()">Load</button>
         </div>
         <div id="games-list"></div>
     </div>
@@ -91,13 +93,14 @@
         <div id="board-container">
             <div id="myBoard"></div>
             <div class="controls">
-                <button class="control-btn" onclick="moveBack()">◀ Back</button>
-                <button class="control-btn" onclick="moveForward()">Next ▶</button>
+                <button class="control-btn" onclick="window.moveBack()">◀ Back</button>
+                <button class="control-btn" onclick="window.moveForward()">Next ▶</button>
             </div>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    
     <script type="module">
         import { Chessboard } from "https://cdn.jsdelivr.net/npm/cm-chessboard@4/src/cm-chessboard/Chessboard.js";
 
@@ -107,7 +110,7 @@
         window.currentMoveIndex = -1;
         window.fetchedGamesList = []; 
 
-        // Load Stockfish Engine
+        // Load Stockfish Engine Background Service
         var stockfish = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
 
         stockfish.onmessage = function(event) {
@@ -125,12 +128,13 @@
             }
         };
 
-        // Initialize natively scalable board layout
+        // Initialize natively scalable vector board on page load
         window.board = new Chessboard(document.getElementById("myBoard"), {
             position: "start",
             sprite: { url: "https://cdn.jsdelivr.net/npm/cm-chessboard@4/assets/images/chessboard-sprite.svg" }
         });
 
+        // Explicitly exposing the fetch action to the global context
         window.fetchGames = function() {
             const user = document.getElementById('username').value.trim();
             const listDiv = document.getElementById('games-list');
@@ -149,18 +153,18 @@
                         const item = document.createElement('div');
                         item.className = 'game-item';
                         item.innerHTML = `<strong>${game.white}</strong> vs <strong>${game.black}</strong><br><span style="color:#b1b0af">${game.result}</span>`;
-                        item.onclick = () => selectGameByIndex(index); 
+                        item.onclick = () => window.selectGameByIndex(index); 
                         listDiv.appendChild(item);
                     });
                 });
-        }
+        };
 
-        function selectGameByIndex(index) {
+        window.selectGameByIndex = function(index) {
             const selectedGame = window.fetchedGamesList[index];
             if (selectedGame && selectedGame.pgn) {
                 loadGamePgn(selectedGame.pgn);
             }
-        }
+        };
 
         function loadGamePgn(pgn) {
             window.gameEngine.load_pgn(pgn);
@@ -184,7 +188,7 @@
                 window.board.setPosition(window.gameEngine.fen());
                 runEngineAnalysis();
             }
-        }
+        };
 
         window.moveBack = function() {
             if (window.currentMoveIndex >= 0) {
@@ -193,7 +197,8 @@
                 runEngineAnalysis();
                 window.currentMoveIndex--;
             }
-        }
+        };
     </script>
 </body>
-</html>
+            </html>
+    
